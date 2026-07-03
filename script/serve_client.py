@@ -57,6 +57,7 @@ async def _run_ray(args, blobs):
     sem = asyncio.Semaphore(args.concurrency)
     lat: list[float] = []
     errs = 0
+    err_samples: list[str] = []
 
     async with httpx.AsyncClient(timeout=300.0) as client:
         async def one(i: int):
@@ -68,24 +69,31 @@ async def _run_ray(args, blobs):
                     r = await client.post(url, content=blob)
                     r.raise_for_status()
                     lat.append(time.perf_counter() - t0)
-                except Exception:
+                except Exception as e:
                     errs += 1
+                    if len(err_samples) < 3:
+                        body = getattr(getattr(e, "response", None), "text", "")
+                        err_samples.append(f"{type(e).__name__}: {e} {body[:200]}")
 
         t0 = time.perf_counter()
         await asyncio.gather(*(one(i) for i in range(args.n)))
         wall = time.perf_counter() - t0
+    for msg in err_samples:
+        print(f"  ERR-SAMPLE: {msg}")
     return wall, lat, errs
 
 
 def _run_triton(args, blobs):
+    """Single gevent-based client + async_infer sliding window (tritonclient.http is built on
+    gevent and must NOT be shared across OS threads — that deadlocks)."""
     import numpy as np
     import soundfile as sf
     import tritonclient.http as tc
-    from concurrent.futures import ThreadPoolExecutor
 
     url = (args.url or "127.0.0.1:8000").replace("http://", "")
     lat: list[float] = []
     errs = 0
+    err_samples: list[str] = []
 
     pcms = []
     for blob in blobs:
@@ -96,25 +104,34 @@ def _run_triton(args, blobs):
             arr = librosa.resample(arr, orig_sr=sr, target_sr=16000)
         pcms.append(np.ascontiguousarray(arr, dtype=np.float32))
 
-    def one(i: int):
-        nonlocal errs
-        client = clients[i % len(clients)]
-        pcm = pcms[i % len(pcms)]
-        inp = tc.InferInput("AUDIO", [len(pcm)], "FP32")
-        inp.set_data_from_numpy(pcm)
-        t0 = time.perf_counter()
-        try:
-            client.infer("granite_asr", inputs=[inp])
-            lat.append(time.perf_counter() - t0)
-        except Exception:
-            errs += 1
+    client = tc.InferenceServerClient(url=url, concurrency=args.concurrency)
+    inflight: list[tuple[object, float]] = []
 
-    clients = [tc.InferenceServerClient(url=url, concurrency=1)
-               for _ in range(args.concurrency)]
-    t0 = time.perf_counter()
-    with ThreadPoolExecutor(max_workers=args.concurrency) as pool:
-        list(pool.map(one, range(args.n)))
-    wall = time.perf_counter() - t0
+    def drain(block_until_below: int):
+        nonlocal errs
+        while len(inflight) >= max(1, block_until_below):
+            handle, t0 = inflight.pop(0)
+            try:
+                handle.get_result()
+                lat.append(time.perf_counter() - t0)
+            except Exception as e:
+                errs += 1
+                if len(err_samples) < 3:
+                    err_samples.append(f"{type(e).__name__}: {e}")
+
+    t0_all = time.perf_counter()
+    for i in range(args.n):
+        pcm = pcms[i % len(pcms)]
+        # max_batch_size>0: first dim is the batch dim -> shape [1, T]
+        inp = tc.InferInput("AUDIO", [1, len(pcm)], "FP32")
+        inp.set_data_from_numpy(pcm.reshape(1, -1))
+        inflight.append((client.async_infer("granite_asr", inputs=[inp]), time.perf_counter()))
+        drain(args.concurrency)
+    drain(1)
+    wall = time.perf_counter() - t0_all
+    client.close()
+    for msg in err_samples:
+        print(f"  ERR-SAMPLE: {msg}")
     return wall, lat, errs
 
 

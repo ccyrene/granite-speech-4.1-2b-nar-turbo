@@ -15,6 +15,13 @@ RUN pip install --no-cache-dir torch==2.9.1 --index-url https://download.pytorch
 COPY requirements.txt /tmp/requirements.txt
 RUN grep -v '^torch==' /tmp/requirements.txt | pip install --no-cache-dir -r /dev/stdin
 
+# Triton-image environment repairs (all hit in practice on 25.05-py3):
+#  * the DALI backend's bundled wheel dir shadows attrs/packaging on the interactive
+#    PYTHONPATH, so pip thinks they're installed while non-login shells can't import them
+#  * the image ships protobuf 7.x; ray-serve needs the pre-6 FieldDescriptor API
+RUN pip install --no-cache-dir --force-reinstall --no-deps attrs packaging wheel wrapt && \
+    pip install --no-cache-dir --force-reinstall "protobuf~=5.29.0"
+
 COPY . /workspace/granite-speech-turbo
 ENV GRANITE_REPO=/workspace/granite-speech-turbo/script
 ENV GRANITE_PTX_CACHE=/root/.ptx

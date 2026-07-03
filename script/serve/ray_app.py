@@ -15,7 +15,6 @@ Env knobs:
 Request:  POST /transcribe  with audio bytes (wav/flac/ogg) as the body
 Response: {"text": ..., "audio_s": ..., "latency_ms": ...}
 """
-from __future__ import annotations
 
 import asyncio
 import os

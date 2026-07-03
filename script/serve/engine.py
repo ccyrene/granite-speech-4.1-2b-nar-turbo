@@ -27,6 +27,17 @@ if _ROOT not in sys.path:
 
 MAX_CLIP_S = 30.0
 SR = 16000
+# batch-dim bucketing: pad execution chunks up to the next grid size so torch.compile sees a
+# bounded set of (batch, frame-bucket) shapes — variable arrival batch sizes otherwise trigger
+# a fresh multi-second compile per novel size (measured: p95 10-16s without this)
+BATCH_GRID = (1, 2, 4, 8, 16, 32, 48)
+
+
+def _grid_size(k: int) -> int:
+    for g in BATCH_GRID:
+        if g >= k:
+            return g
+    return BATCH_GRID[-1]
 
 
 class TurboServeEngine:
@@ -46,8 +57,10 @@ class TurboServeEngine:
         # replicas (run 2 replicas per GPU to hide host prep/decode — measured 1.4-4.5% e2e)
         self._gpu_lock = threading.Lock()
 
-    def warmup(self, seconds=(2, 5, 10, 20, 30), batch_sizes=(1, 8, 16)) -> None:
+    def warmup(self, seconds=(2, 5, 10, 20, 30), batch_sizes=None) -> None:
         """Populate compile caches for the shape buckets a serving workload actually hits."""
+        if batch_sizes is None:
+            batch_sizes = [g for g in BATCH_GRID if g <= self.exec_batch]
         for bs in batch_sizes:
             for s in seconds:
                 wav = torch.zeros(int(s * SR), dtype=torch.float32)
@@ -66,9 +79,13 @@ class TurboServeEngine:
         order = sorted(short_idx, key=lambda i: wavs[i].shape[-1])
         for c0 in range(0, len(order), self.exec_batch):
             idx = order[c0:c0 + self.exec_batch]
+            batch = [wavs[i] for i in idx]
+            pad = _grid_size(len(batch)) - len(batch)
+            if pad:
+                batch = batch + [batch[-1]] * pad   # pad with copies; outputs discarded
             with self._gpu_lock:
-                texts = self._fn([wavs[i] for i in idx])
-            for i, t in zip(idx, texts):
+                texts = self._fn(batch)
+            for i, t in zip(idx, texts[:len(idx)]):
                 out[i] = t
 
         for i in long_idx:
