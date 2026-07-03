@@ -140,8 +140,8 @@ KV cache, no decode loop) — continuous batching and paged attention have nothi
 
 - `EXEC_BATCH` (default 48): keep ≤48 with max-autotune — b≥64 hits a known Inductor
   autotune failure class on torch 2.9.1.
-- `ADAPTIVE=1`: CTC-first routing, ≤+0.08 WER points, large throughput win. `0` = strictly
-  lossless path.
+- Adaptive CTC-first routing is always on (the shipped path): ≤+0.08 WER points, large throughput
+  win. Thresholds live in `configs/routing.yaml`.
 - `TORCHINDUCTOR_CACHE_DIR` + `GRANITE_PTX_CACHE` on a persistent volume: first boot pays
   5-10 min of autotune, every boot after that is warm.
 - Batch window (50 ms default): raise it under bursty low-QPS traffic to form fuller

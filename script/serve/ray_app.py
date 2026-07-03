@@ -5,7 +5,6 @@
 
 Env knobs:
     MODEL_DIR        path to the HF snapshot (default: ./ref)
-    ADAPTIVE=1       CTC-first adaptive routing (0 = strictly lossless path)
     NUM_REPLICAS=1   replicas total
     GPUS_PER_REPLICA=1.0   set 0.5 to pack 2 replicas per GPU — hides host prep/decode
                            (the measured e2e/model gap: 1.4% A100 -> 4.5% H200)

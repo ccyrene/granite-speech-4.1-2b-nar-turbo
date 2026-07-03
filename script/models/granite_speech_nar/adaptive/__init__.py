@@ -1,9 +1,9 @@
 """Adaptive-inference layer for Granite Speech NAR (OPTIMIZATION_PLAN Phases 2-8).
 
-Everything here is *additive* and *opt-in*: the default ``model.transcribe(...)`` path
-is untouched (bit-exact lossless baseline). The adaptive path is reached only through
-``model.transcribe_adaptive(...)`` with an :class:`AdaptiveConfig` whose ``enabled`` flag
-defaults to ``False``.
+Everything here is *additive*: the underlying ``model.transcribe(...)`` full-editor pass is
+untouched (bit-exact) and is what the router falls back to for hard utterances. The adaptive
+path runs through ``model.transcribe_adaptive(...)`` with a :class:`RoutingConfig`; the shipped
+FastGraniteASR wrapper always enables it.
 
 Pipeline the adaptive layer implements on top of the encoder+CTC output:
 

@@ -41,18 +41,17 @@ def _grid_size(k: int) -> int:
 
 
 class TurboServeEngine:
-    def __init__(self, model_dir: str | None = None, adaptive: bool | None = None,
+    def __init__(self, model_dir: str | None = None,
                  exec_batch: int | None = None, compile: bool | None = None,
                  compile_mode: str | None = None, device: str = "cuda"):
         from fast import FastGraniteASR
         model_dir = model_dir or os.environ.get("MODEL_DIR", os.path.join(os.path.dirname(_ROOT), "ref"))
-        self.adaptive = (os.environ.get("ADAPTIVE", "1") == "1") if adaptive is None else adaptive
         self.exec_batch = int(os.environ.get("EXEC_BATCH", "48")) if exec_batch is None else exec_batch
         compile = (os.environ.get("COMPILE", "1") == "1") if compile is None else compile
         compile_mode = os.environ.get("COMPILE_MODE") or compile_mode
         self.asr = FastGraniteASR(model_dir, device=device, compile=compile,
-                                  compile_mode=compile_mode, adaptive=self.adaptive)
-        self._fn = self.asr.transcribe_adaptive if self.adaptive else self.asr.transcribe
+                                  compile_mode=compile_mode)
+        self._fn = self.asr.transcribe   # CTC-first adaptive is the shipped path
         # one engine = one CUDA context/stream: serialize GPU entry, overlap happens across
         # replicas (run 2 replicas per GPU to hide host prep/decode — measured 1.4-4.5% e2e)
         self._gpu_lock = threading.Lock()

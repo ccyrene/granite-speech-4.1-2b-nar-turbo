@@ -1,4 +1,4 @@
-"""FastGraniteASR — the validated LOSSLESS + ~2.8x optimized inference path for Granite Speech 4.1 2B NAR.
+"""FastGraniteASR — the optimized adaptive CTC-first inference path for Granite Speech 4.1 2B NAR.
 
 This is the shippable config from the A100 optimization study. It is pure ``torch.compile`` (NO TensorRT):
 TensorRT was faster per-kernel but bf16-lossy (5.7% WER vs 1.37% baseline), so it is deliberately not used.
@@ -8,11 +8,15 @@ What it stacks on top of the bit-identical `models/granite_speech_nar` reimpleme
      (CPU pad_sequence was ~150ms on a fast host; on-GPU it's ~0.03ms). The single biggest e2e win.
   2. torch.compile(encoder)            — branch-free conformer; FRAME_GRID frame-bucketing keeps the
      compiled shapes stable (few recompiles) and is bit-exact.
-  3. torch.compile(projector / LLM)    — inductor bf16 == eager numerics → WER-lossless (unlike TRT).
+  3. torch.compile(projector / LLM)    — inductor bf16 == eager numerics (unlike TRT).
   4. text-only LM head                 — runs the tied head only on the text segments (VRAM -16%).
+  5. CTC-first adaptive routing        — easy utterances exit on the CTC hypothesis; only hard ones pay
+     the full LLM-editor pass. This is the shipped path (≤0.08 WER over the full-editor pass it falls
+     back to, large throughput win). See `configs/routing.yaml`.
 
-Validated on A100 / LibriSpeech test.clean (full, n=2588):  RTFx 793 (model) / WER 1.37% (jiwer) 1.16%
-(kaldi) == baseline 1.39/1.16  — i.e. lossless, ~2.8x over eager (RTFx 277->~790).
+The compiled stack (1–4) is bit-exact to the eager reimplementation, which is itself head-to-head
+identical to the official implementation (LibriSpeech clean 1.38 ≡ 1.38); the adaptive router (5)
+adds ≤0.08 WER on every set measured.
 
 `compile_mode="reduce-overhead"` adds CUDA-graph capture (lower single-utterance latency) but needs stable
 shapes; the default (None) is shape-flexible and is the config WER-validated at scale.
@@ -51,7 +55,7 @@ def _configure_dynamo_limits(limit: int = 64):
 class FastGraniteASR:
     def __init__(self, model_dir: str, device: str = "cuda", frame_grid: int = 128,
                  compile_mode: str | None = None, text_only_head: bool = True, compile: bool = True,
-                 seq_grid: int = 0, adaptive: bool = False, routing_config: "str | dict | None" = None):
+                 seq_grid: int = 0, routing_config: "str | dict | None" = None):
         """
         model_dir     : dir with config.json + model.safetensors + tokenizer.json
         frame_grid    : pad mel frames to a multiple of this so the compiled encoder sees few shapes
@@ -61,27 +65,22 @@ class FastGraniteASR:
         compile       : False -> pure-eager baseline (no torch.compile), for apples-to-apples comparison
         seq_grid      : Phase 7 — bucket the editor's packed [audio;text] length to a multiple of this
                         (0 = off) so the compiled projector/editor see stable shapes (unblocks
-                        reduce-overhead / CUDA-graph on the editor). Used by transcribe_adaptive.
-        adaptive      : True -> `transcribe_adaptive` routes through the CTC-first fast path by default
-                        (A100 winner: L4 = compile+texthead+frame_grid=128+adaptive, +45% RTFx, VRAM -29%,
-                        near-lossless). This is a RUNTIME switch: it forces `self.routing.enabled=True`
-                        without mutating the committed `configs/routing.yaml` (which stays enabled:false).
-                        Default False keeps the whole instance strictly lossless until the full-set WER
-                        gate confirms the ~0.05 WER delta is run-to-run noise (measured across full-set gates).
-        routing_config: path/dict for the adaptive thresholds (default: <repo>/configs/routing.yaml).
+                        reduce-overhead / CUDA-graph on the editor).
+        routing_config: path/dict for the adaptive-routing thresholds (default: <repo>/configs/routing.yaml).
                         Loaded into self.routing/self.verifier/self.early_exit; missing file or no pyyaml
-                        falls back to dataclass defaults (still lossless unless adaptive=True).
+                        falls back to dataclass defaults. Routing is always enabled here — CTC-first
+                        adaptive is the shipped inference path (+45% RTFx, VRAM -29%, ≤0.08 WER over the
+                        full-editor pass it falls back to for hard utterances).
         """
         self.device = device
         self.frame_grid = frame_grid if compile else 0   # bucketing only helps the compiled encoder
         self.seq_grid = seq_grid if compile else 0        # packed-length bucketing only helps compiled editor
         self.text_only_head = text_only_head
         self._compiled = bool(compile)
-        self.adaptive = bool(adaptive)
-        self.last_routes = None                           # per-sample routes of the last adaptive call
+        self.last_routes = None                           # per-sample routes of the last call
 
-        # Adaptive routing config (Phases 2-8). Load once; `adaptive=True` is the runtime master switch
-        # so the shipped configs/routing.yaml can stay enabled:false until the A100 full-set WER gate.
+        # Adaptive routing config (Phases 2-8). Load once; routing is always enabled here — CTC-first
+        # adaptive is the shipped path (the committed configs/routing.yaml may stay enabled:false).
         cfg_src = routing_config if routing_config is not None else os.path.join(_REPO_ROOT, "configs", "routing.yaml")
         try:
             self.routing, self.verifier, self.early_exit = load_adaptive_config(cfg_src)
@@ -89,8 +88,7 @@ class FastGraniteASR:
             import warnings
             warnings.warn(f"FastGraniteASR: could not load routing config {cfg_src!r} ({e}); using defaults")
             self.routing, self.verifier, self.early_exit = RoutingConfig(), VerifierConfig(), EarlyExitConfig()
-        if self.adaptive:
-            self.routing.enabled = True                   # runtime flip; committed yaml untouched
+        self.routing.enabled = True                       # adaptive CTC-first routing is the shipped path
 
         self.model = load_model(model_dir, device=device)
         self.fe = MelFeatureExtractor()
@@ -125,27 +123,16 @@ class FastGraniteASR:
         return feats
 
     @torch.inference_mode()
-    def transcribe(self, waveforms, sample_rate: int = 16000) -> list[str]:
-        """waveforms: a 1-D tensor/np-array, or a list of them (16 kHz mono). Returns transcripts."""
-        if sample_rate != 16000:
-            raise ValueError(f"expected 16 kHz, got {sample_rate} (resampling was removed with torchaudio)")
-        if not isinstance(waveforms, (list, tuple)):
-            waveforms = [waveforms]
-        wavs = [w if torch.is_tensor(w) else torch.as_tensor(w) for w in waveforms]
-        feats = self.fe(wavs, device=self.device)            # GPU-resident mel front-end
-        feats = self._bucket(feats)
-        out = self.model.transcribe(**feats, text_only_head=self.text_only_head)
-        ids = out.preds_host if getattr(out, "preds_host", None) is not None else out.preds
-        return self.tok.batch_decode(ids)
+    def transcribe(self, waveforms, routing=None, verifier=None, early_exit=None,
+                   sample_rate: int = 16000) -> list[str]:
+        """CTC-first adaptive transcription (OPTIMIZATION_PLAN Phases 2-8) — the shipped path.
 
-    @torch.inference_mode()
-    def transcribe_adaptive(self, waveforms, routing=None, verifier=None, early_exit=None,
-                            sample_rate: int = 16000) -> list[str]:
-        """CTC-first adaptive inference (OPTIMIZATION_PLAN Phases 2-4). ``routing``/``verifier``/
-        ``early_exit`` default to the instance config loaded at construction (enabled iff the instance
-        was built with ``adaptive=True``); pass them explicitly to override. With the routing disabled
-        this is exactly ``transcribe`` (lossless). Sets ``self.last_routes`` to the per-sample route
-        list. ``early_exit`` (Phase 5) is eager-only and is ignored when compiled."""
+        ``waveforms``: a 1-D tensor/np-array, or a list of them (16 kHz mono). Returns transcripts.
+        Easy utterances exit on the CTC hypothesis; only hard ones pay the full LLM-editor pass
+        (≤0.08 WER over that full-editor pass, large throughput win). ``routing``/``verifier``/
+        ``early_exit`` default to the instance config; pass them to override. Sets ``self.last_routes``
+        to the per-sample route list. ``early_exit`` (Phase 5) is eager-only and is ignored when compiled.
+        """
         if sample_rate != 16000:
             raise ValueError(f"expected 16 kHz, got {sample_rate} (resampling was removed with torchaudio)")
         if routing is None:
@@ -157,9 +144,9 @@ class FastGraniteASR:
         if not isinstance(waveforms, (list, tuple)):
             waveforms = [waveforms]
         wavs = [w if torch.is_tensor(w) else torch.as_tensor(w) for w in waveforms]
-        feats = self.fe(wavs, device=self.device)
+        feats = self.fe(wavs, device=self.device)            # GPU-resident mel front-end
         feats = self._bucket(feats)
-        ee = None if self._compiled else early_exit    # data-dependent break breaks torch.compile
+        ee = None if self._compiled else early_exit          # data-dependent break breaks torch.compile
         out = self.model.transcribe_adaptive(**feats, routing=routing, verifier=verifier,
                                              text_only_head=self.text_only_head, early_exit=ee,
                                              seq_grid=self.seq_grid)

@@ -4,7 +4,8 @@ Hand-tuned pure-PyTorch inference stack for
 [`ibm-granite/granite-speech-4.1-2b-nar`](https://huggingface.co/ibm-granite/granite-speech-4.1-2b-nar)
 (non-autoregressive CTC-editing ASR, [NLE architecture](https://arxiv.org/abs/2603.08397)) —
 **~3× the official HuggingFace implementation head-to-head, ~2.2× the model card's published
-RTFx, with WER verified identical to the reference.**
+RTFx — WER verified against the reference: the full-editor pass matches it head-to-head, and the
+shipped adaptive path adds ≤0.08 WER.**
 
 | GPU | RTFx (e2e) | RTFx (model-only) | WER j/k | VRAM |
 |---|---:|---:|---|---:|
@@ -19,26 +20,29 @@ test.clean, 500-clip subset, bf16, batch 128 (executed in chunks of 48). IBM's m
 
 ## WER — verified, not assumed
 
-**Head-to-head vs the official implementation** (same audio, same scorer, same GPU):
+**Head-to-head vs the official implementation** (same audio, same scorer, same GPU) — this is the
+full-editor pass the adaptive router falls back to for hard utterances, so the editor itself is
+reference-exact:
 
-| dataset (full test set) | this repo | official impl | 
+| dataset (full test set) | this repo (full-editor) | official impl |
 |---|---:|---:|
 | LibriSpeech clean | 1.38 | 1.38 |
 | LibriSpeech other | 2.76 | 2.79 |
 | AMI | 7.98 | 8.09 |
 | SPGISpeech (39,341 utts) | 3.49 | 3.48 |
 
-**Vs the model card** (same stated methodology — greedy, bf16, jiwer + Whisper EnglishTextNormalizer):
+**Vs the model card** (same stated methodology — greedy, bf16, jiwer + Whisper EnglishTextNormalizer),
+shipped adaptive path:
 
-| dataset | model card | this repo (lossless) | this repo (adaptive) |
-|---|---:|---:|---:|
-| LibriSpeech clean | 1.29 | 1.38 | 1.40 |
-| LibriSpeech other | 2.75 | 2.76 | 2.81 |
-| AMI | 7.91 | 7.98 | 8.03 |
-| Earnings-22 | 8.48 | **8.48** | **8.48** |
-| GigaSpeech | 10.12 | 10.22 | 10.21 |
-| SPGISpeech | 3.04 | 3.49* | 3.49* |
-| VoxPopuli | 5.83 | 5.90 | 5.97 |
+| dataset | model card | this repo (adaptive) |
+|---|---:|---:|
+| LibriSpeech clean | 1.29 | 1.40 |
+| LibriSpeech other | 2.75 | 2.81 |
+| AMI | 7.91 | 8.03 |
+| Earnings-22 | 8.48 | **8.48** |
+| GigaSpeech | 10.12 | 10.21 |
+| SPGISpeech | 3.04 | 3.49* |
+| VoxPopuli | 5.83 | 5.97 |
 
 *The SPGISpeech gap lives in the scoring pipeline, not the model: the official implementation
 scores 3.48 through this repo's scorer (see head-to-head above). WER absolute numbers are only
@@ -59,8 +63,8 @@ comparable within one scoring pipeline — even IBM's own two published numbers 
   Microbench +19–32% across A100/H100/H200; end-to-end +0.6–1.5%. Falls back to the eager path
   automatically if NVRTC compilation or the numerical test-fire fails (look for `convkernel(16)`
   vs `convkernel(0)` in logs).
-- **Confidence-routed adaptive inference** (`adaptive` lever, `configs/routing.yaml`) — easy
-  utterances exit via the CTC hypothesis; only hard ones pay for the full LLM-editor pass.
+- **Confidence-routed adaptive inference** (the shipped inference path, `configs/routing.yaml`) —
+  easy utterances exit via the CTC hypothesis; only hard ones pay for the full LLM-editor pass.
   ≤ +0.08 WER points on every set measured (free on Earnings-22 and GigaSpeech).
 - **FlexAttention + restructured encoder attention** (`flexattn`, `encattn`, `encdense` levers)
   for the Conformer block-attention and relative-position path.

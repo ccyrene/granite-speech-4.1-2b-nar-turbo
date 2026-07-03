@@ -1,5 +1,5 @@
 """Long-form audio handling for FastGraniteASR: split >max_s audio into overlapping windows, transcribe
-each, then stitch the per-window transcripts back losslessly by de-duplicating the overlap region.
+each, then stitch the per-window transcripts back exactly by de-duplicating the overlap region.
 
 Why overlap + merge (not hard 30s cuts): a hard boundary cuts a word in half -> both neighbouring windows
 mis-transcribe it. With an N-second overlap the boundary word is seen whole by at least one window; the
@@ -7,7 +7,7 @@ merge finds the longest matching run of words inside the overlap and joins there
 
 Why not zero-pad the waveform to exactly max_s: that makes the model see trailing silence as real audio
 (mask would mark it valid -> possible hallucination). We pass the real-length chunk to the feature
-extractor, which builds the attention_mask from the true length -> the model masks padding (lossless).
+extractor, which builds the attention_mask from the true length -> the model masks padding (bit-exact).
 The FRAME_GRID bucketing then keeps the compiled encoder shape stable.
 """
 from __future__ import annotations

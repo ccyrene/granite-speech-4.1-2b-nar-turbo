@@ -1,9 +1,8 @@
 """Demo: transcribe a wav with the FastGraniteASR path + report warm latency / RTFx.
 
-  python script/fast_demo.py [--model-dir DIR] [--wav PATH] [--mode reduce-overhead] [--lossless]
+  python script/fast_demo.py [--model-dir DIR] [--wav PATH] [--mode reduce-overhead]
 
-Defaults to the adaptive CTC-first winner (+45% RTFx / VRAM -29%, near-lossless).
-Pass --lossless to fall back to the strictly bit-exact `transcribe` path.
+Uses the adaptive CTC-first path (+45% RTFx / VRAM -29%, ≤0.08 WER over the full-editor pass).
 Defaults to the bundled sample (ref/10226_10111_000000.wav). model-dir defaults to ref/ (or set
 MODEL_DIR, e.g. an HF snapshot dir with config.json + model.safetensors + tokenizer.json).
 """
@@ -33,18 +32,14 @@ def main():
     ap.add_argument("--model-dir", default=os.environ.get("MODEL_DIR", os.path.join(ROOT, "ref")))
     ap.add_argument("--wav", default=os.path.join(ROOT, "ref", "10226_10111_000000.wav"))
     ap.add_argument("--mode", default=None, help="None | reduce-overhead | max-autotune")
-    ap.add_argument("--lossless", action="store_true",
-                    help="use the strictly bit-exact transcribe path (default: adaptive CTC-first)")
     args = ap.parse_args()
 
     dev = "cuda" if torch.cuda.is_available() else "cpu"
-    adaptive = not args.lossless
-    asr = FastGraniteASR(args.model_dir, device=dev, compile_mode=args.mode, adaptive=adaptive)
-    fn = asr.transcribe if args.lossless else asr.transcribe_adaptive
-    path = "lossless" if args.lossless else "adaptive"
+    asr = FastGraniteASR(args.model_dir, device=dev, compile_mode=args.mode)
+    fn = asr.transcribe
     wav, sr = load_wav(args.wav)
     secs = wav.shape[-1] / sr
-    print(f"device={dev} mode={args.mode} path={path} | audio={secs:.2f}s")
+    print(f"device={dev} mode={args.mode} path=adaptive | audio={secs:.2f}s")
 
     # warm (compiles the bucket for this length)
     txt = fn(wav, sample_rate=sr)[0]
@@ -62,8 +57,7 @@ def main():
     print(f"\nwarm e2e: {ms:.2f} ms  | RTFx (single utterance): {secs / (ms / 1e3):.1f}")
     if dev == "cuda":
         print(f"peak VRAM: {torch.cuda.max_memory_allocated() / 1e9:.2f} GB")
-    if adaptive:
-        print(f"routes: {asr.last_routes}")   # ['ctc_fast' | 'local' | 'full'] per input
+    print(f"routes: {asr.last_routes}")        # ['ctc_fast' | 'local' | 'full'] per input
     print(f"\nTRANSCRIPT:\n{txt}")
 
 

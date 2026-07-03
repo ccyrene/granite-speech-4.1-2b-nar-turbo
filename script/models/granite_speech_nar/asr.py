@@ -399,7 +399,7 @@ class GraniteSpeechNarForASR(nn.Module):
           ctc_fast : return the CTC hypothesis (skip the editor)  -- the big latency win
           local    : edit only suspicious windows (if routing.local_crop_audio) + verifier + fallback
           full     : run the full NAR editor (the baseline path)
-        With ``routing.enabled=False`` (default) this is EXACTLY ``transcribe`` (lossless).
+        With ``routing.enabled=False`` (default) this is EXACTLY ``transcribe`` (bit-exact).
 
         P2.1: the collapsed hypothesis is taken from the confidence bundle (the previous separate
         full-vocab CTC argmax pass was a duplicate — unit-tested identical); span detection and

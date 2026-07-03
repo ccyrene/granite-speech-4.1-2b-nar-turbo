@@ -4,7 +4,7 @@
 # and gate every change with scripts/eval_suite.py before loosening.
 
 routing:
-  enabled: false            # master switch; false => transcribe_adaptive == transcribe (lossless)
+  enabled: false            # master switch; false => transcribe_adaptive == transcribe (bit-exact)
 
   # --- ctc_fast gate (skip the editor only when ALL pass) ---
   high_conf_threshold: 0.92         # mean collapsed-token confidence >=

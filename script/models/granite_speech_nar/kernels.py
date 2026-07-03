@@ -1,6 +1,6 @@
 """Opt-in custom-kernel backend for the LLM editor (OPTIMIZATION_PLAN Phase 6 integration).
 
-Default: **OFF** — the bit-exact torch path in ``llm.py`` runs unchanged, so the lossless baseline
+Default: **OFF** — the bit-exact torch path in ``llm.py`` runs unchanged, so the bit-exact baseline
 is untouched. Enable with ``GRANITE_KERNEL_BACKEND=cuda`` (or ``cutile``); it only takes effect on
 CUDA tensors, and only if ``cuda_kernels`` + its NVRTC/cuTile toolchain import successfully —
 otherwise it silently falls back to the torch reference.

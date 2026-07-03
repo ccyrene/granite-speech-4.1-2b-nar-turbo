@@ -1,7 +1,9 @@
-# `fast/` — compile-lossless inference for Granite Speech 4.1 2B NAR
+# `fast/` — optimized adaptive inference for Granite Speech 4.1 2B NAR
 
-The shippable, **WER-lossless**, ~2.8x-faster inference path, validated on A100 / LibriSpeech.
-Pure `torch.compile` — **no TensorRT** (TRT was faster per-kernel but bf16-lossy; see below).
+The shippable, ~2.8x-faster inference path, validated on A100 / LibriSpeech. `transcribe()` is the
+CTC-first **adaptive** path (≤0.08 WER over the full-editor pass it falls back to for hard
+utterances); the compiled stack underneath is bit-exact to eager. Pure `torch.compile` — **no
+TensorRT** (TRT was faster per-kernel but bf16-lossy; see below).
 
 ```python
 from fast import FastGraniteASR
@@ -13,7 +15,7 @@ or `python script/fast_demo.py --wav my.wav`
 
 ## What it does (stacked on the bit-identical `models/granite_speech_nar` reimpl)
 
-| # | optimization | effect | lossless? |
+| # | optimization | effect | bit-exact? |
 |---|---|---|---|
 | 1 | **GPU-resident features** (`features.py`: move wav to GPU *before* `pad_sequence`) | feature 152ms → 0.6ms (CPU `pad_sequence` was the killer); full e2e 216→64ms | yes (value-preserving) |
 | 2 | **`torch.compile(encoder)`** + FRAME_GRID=128 frame-bucketing (branch-free conformer) | removes launch overhead; stable compiled shapes | yes (bit-exact) |
@@ -25,21 +27,21 @@ or `python script/fast_demo.py --wav my.wav`
 | config | RTFx (model) | WER jiwer/kaldi | single-utterance e2e |
 |---|---|---|---|
 | eager baseline | 625 | 1.39% / 1.16% | 61 ms |
-| **this (compile, default)** | **~794 (batch 16)** | **1.37% / 1.16%** ✓ lossless | ~29 ms |
-| this (`compile_mode="reduce-overhead"`) | — | (same, lossless) | ~26 ms |
+| **this (compile, default)** | **~794 (batch 16)** | **1.37% / 1.16%** ✓ bit-exact | ~29 ms |
+| this (`compile_mode="reduce-overhead"`) | — | (same, bit-exact) | ~26 ms |
 | ~~all-TensorRT~~ | (≈22 ms) | **5.7%** ✗ lossy | 22 ms |
 
-- **lossless**: 1.37% ≈ baseline 1.39% (noise); kaldi 1.16% identical. Probe transcript-exact.
+- **bit-exact**: 1.37% ≈ baseline 1.39% (noise); kaldi 1.16% identical. Probe transcript-exact.
 - **~2.8x** over eager (RTFx 277 → ~790 single-utterance equiv after batching).
 - RTFx is **compute-bound** at ~790 (2B model: 16-layer conformer + 40-layer bidirectional LLM). Batch is
   flat 8–16. To go higher needs *less compute* = quantization (int8 broke on A100; **fp8 needs H100** +
-  calibration + WER-gate) — `torch.compile` / batching / CUDA-graphs are maxed for the lossless path.
+  calibration + WER-gate) — `torch.compile` / batching / CUDA-graphs are maxed for the bit-exact path.
 
 ## Why no TensorRT
 editor→TRT (bf16) is 3.6x faster per-component and transcript-exact on one sample, but on the full set it
 gives **5.7% WER** (vs 1.37%): TRT's bf16 attention/GEMM kernels diverge ~7x more than inductor from eager
 (max|Δlogit| 4.56 vs 0.66), flipping enough tokens to wreck WER. `torch.compile` reaches ~the same speed
-(editor 9.6ms ≈ TRT 9.3ms via CUDA graphs) **while staying lossless**. So TRT is intentionally dropped.
+(editor 9.6ms ≈ TRT 9.3ms via CUDA graphs) **while staying bit-exact**. So TRT is intentionally dropped.
 
 ## Long-form audio (`transcribe_long`)
 The model has **no built-in max length** but a soft cap: the LLM `max_position_embeddings=4096` bounds the
@@ -53,7 +55,7 @@ It splits >30s audio into **30s windows with 5s overlap**, batch-transcribes the
 length well under the cap), and stitches per-audio transcripts back by **de-duplicating the overlap**
 (difflib longest-match — the boundary word is seen whole by ≥1 window). It does *not* zero-pad the
 waveform (that would feed the model real silence); real-length windows go through the feature extractor so
-`attention_mask` masks padding losslessly.
+`attention_mask` masks padding exactly.
 
 Validated (concatenated test.clean, A100):
 | audio | whole `transcribe` | `transcribe_long` |
@@ -62,7 +64,7 @@ Validated (concatenated test.clean, A100):
 | 135 s (< cap) | 4.17% | **2.56%** (≈/better — model prefers 30s windows) |
 | ≤ 30 s | — | identical to `transcribe` (1 window, no merge) |
 
-→ near-lossless (even quality-neutral-to-better) and **required** for audio beyond ~4 min.
+→ near-exact (even quality-neutral-to-better) and **required** for audio beyond ~4 min.
 
 ## Files
 - `fast_asr.py` — `FastGraniteASR`: load + compile + GPU-resident feature + FRAME_GRID bucketing + texthead
