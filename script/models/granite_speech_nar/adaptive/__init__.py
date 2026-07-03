@@ -16,7 +16,7 @@ Pipeline the adaptive layer implements on top of the encoder+CTC output:
            C. full     : run the full NAR editor           (unchanged path)
 
 All the pure-tensor pieces (confidence, routing, spans, packing) are unit-tested on
-CPU with synthetic logits in ``scripts/test_adaptive.py`` — no GPU / weights needed.
+CPU with synthetic logits in ``script/test_adaptive.py`` — no GPU / weights needed.
 """
 from __future__ import annotations
 

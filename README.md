@@ -71,7 +71,7 @@ comparable within one scoring pipeline — even IBM's own two published numbers 
   kept in `cuda_kernels/` for reference.
 - GLU-fused depthwise conv: **+17% on RTX 3060, −45% on H100** — memory-bound wins flip to
   ALU-bound losses on high-bandwidth parts. Always re-gate microbenches on the target GPU
-  (`python -m cuda_kernels.conv1d`).
+  (`(cd script && python -m cuda_kernels.conv1d)`).
 - Chunked 100k-vocab text-head argmax: same HBM bytes, more launches (a real fix needs a fused
   GEMM epilogue).
 
@@ -95,18 +95,18 @@ EOF
 ln -s <printed_path> ref
 
 # 2) reproduce the record run (subset-500, all levers, b128/exec48)
-python scripts/best_run.py
+python script/best_run.py
 
 # 3) full-set WER gates
-python scripts/best_run.py --variant gate_clean --split test.clean --max-samples 0
-python scripts/best_run.py --variant gate_other --split test.other --max-samples 0
+python script/best_run.py --variant gate_clean --split test.clean --max-samples 0
+python script/best_run.py --variant gate_other --split test.other --max-samples 0
 ```
 
 Direct harness invocation (all levers explicit):
 
 ```bash
 FRAME_GRID=128 EXEC_BATCH=48 ENC_COMPILE_MODE=max-autotune-no-cudagraphs \
-python scripts/bench_asr.py \
+python script/bench_asr.py \
   --levers compile-enc,compile-proj,compile-llm,texthead,adaptive,flexattn,encattn,encdense,freeze,convkernel \
   --model-dir "$(readlink -f ref)" --config librispeech --split test.clean \
   --batch 128 --max-samples 500 --no-probe
@@ -115,16 +115,22 @@ python scripts/bench_asr.py \
 ## Repo layout
 
 ```
-models/granite_speech_nar/   pure-PyTorch reimplementation (encoder/projector/LLM editor,
-                             adaptive routing, BN folding, custom-op integration)
-cuda_kernels/                the winning fused dwconv+bias+SiLU NVRTC kernel
-                             (self-benchmark: python -m cuda_kernels.conv1d)
-fast/                        compile-friendly serving wrapper (FastGraniteASR, 30s chunking)
-best/                        one-command record-run configuration
-serve/                       production serving: Ray Serve + Triton backends over one shared
-                             engine, with a unified load-test client (see serve/README.md)
-scripts/bench_asr.py         the benchmark harness behind every number in this README
-configs/routing.yaml         adaptive-routing thresholds
+script/                          all code lives here (script/ is the import root)
+├── bench_asr.py                 the benchmark harness behind every number in this README
+├── best_run.py                  one-command record-run entry point
+├── fast_demo.py                 single-wav demo (latency / RTFx)
+├── serve_client.py              unified load-test client for both serving backends
+├── models/granite_speech_nar/   pure-PyTorch reimplementation (encoder/projector/LLM editor,
+│                                adaptive routing, BN folding, custom-op integration)
+├── cuda_kernels/                the winning fused dwconv+bias+SiLU NVRTC kernel
+│                                (self-benchmark: cd script && python -m cuda_kernels.conv1d)
+├── fast/                        compile-friendly serving wrapper (FastGraniteASR, 30s chunking)
+├── best/                        record-run configuration constants
+├── serve/                       Ray Serve + Triton backends over one shared engine
+│                                (see script/serve/README.md)
+└── configs/routing.yaml         adaptive-routing thresholds
+ref/                             model snapshot (gitignored — see Quickstart)
+results/                         benchmark outputs (gitignored)
 ```
 
 ## Methodology notes

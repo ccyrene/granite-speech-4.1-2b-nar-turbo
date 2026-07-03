@@ -3,9 +3,9 @@
 One-command reproduction of the session-C record run:
 
 ```bash
-python scripts/best_run.py                    # subset-500, defaults = record run
-python scripts/best_run.py --max-samples 64   # quick smoke test
-python scripts/best_run.py --split test.other --max-samples 0   # full set
+python script/best_run.py                    # subset-500, defaults = record run
+python script/best_run.py --max-samples 64   # quick smoke test
+python script/best_run.py --split test.other --max-samples 0   # full set
 ```
 
 ## The config

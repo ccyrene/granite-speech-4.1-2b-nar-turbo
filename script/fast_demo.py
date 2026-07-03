@@ -1,6 +1,6 @@
 """Demo: transcribe a wav with the FastGraniteASR path + report warm latency / RTFx.
 
-  python scripts/fast_demo.py [--model-dir DIR] [--wav PATH] [--mode reduce-overhead] [--lossless]
+  python script/fast_demo.py [--model-dir DIR] [--wav PATH] [--mode reduce-overhead] [--lossless]
 
 Defaults to the adaptive CTC-first winner (+45% RTFx / VRAM -29%, near-lossless).
 Pass --lossless to fall back to the strictly bit-exact `transcribe` path.
@@ -14,8 +14,9 @@ import time
 
 import torch
 
-ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-sys.path.insert(0, ROOT)
+SCRIPT = os.path.dirname(os.path.abspath(__file__))
+ROOT = os.path.dirname(SCRIPT)
+sys.path.insert(0, SCRIPT)
 from fast import FastGraniteASR  # noqa: E402
 
 

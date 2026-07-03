@@ -7,7 +7,7 @@ apply the filterbank with a matmul. This reproduces
 ``torch.stft`` under the hood), then applies the reference whisper-style log
 compression and 2-frame stacking.
 
-Regenerate ``mel_filters.pt`` with ``scripts/extract_mel.py`` if the STFT params change.
+Regenerate ``mel_filters.pt`` with ``script/extract_mel.py`` if the STFT params change.
 """
 from __future__ import annotations
 

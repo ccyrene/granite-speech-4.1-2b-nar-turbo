@@ -16,9 +16,9 @@ WER-gated deviation class (encattn + BN fold are not bit-exact; transcripts veri
 reference goldens; full-set gates PASS: clean 1.42/1.19, other 2.81/2.52).
 
 Usage:
-    python scripts/best_run.py                      # subset-500 bench on ref/ (defaults = the record run)
-    python scripts/best_run.py --max-samples 64     # quick smoke
-    python scripts/best_run.py --split test.other --max-samples 0   # full set
+    python script/best_run.py                      # subset-500 bench on ref/ (defaults = the record run)
+    python script/best_run.py --max-samples 64     # quick smoke
+    python script/best_run.py --split test.other --max-samples 0   # full set
 """
 
 BEST_LEVERS = ("compile-enc,compile-proj,compile-llm,texthead,"

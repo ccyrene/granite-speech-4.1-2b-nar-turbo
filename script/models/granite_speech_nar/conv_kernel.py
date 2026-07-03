@@ -7,7 +7,7 @@ replaces the conv + BN + SiLU chain. Registered as a ``torch.library`` custom op
 fullgraph-safe, launches on torch's current stream.
 
 Opt-in: ``GRANITE_CONV_KERNEL=dwconv_silu`` (read in loader.load_model, or apply the
-``convkernel`` lever in scripts/bench_asr.py). ``enable_dwconv_silu(model)`` folds BN,
+``convkernel`` lever in script/bench_asr.py). ``enable_dwconv_silu(model)`` folds BN,
 test-fires the kernel against the torch path and only then flips each module's
 ``_fused_conv`` flag — any toolchain/launch failure falls back to the torch path.
 

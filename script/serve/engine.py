@@ -34,7 +34,7 @@ class TurboServeEngine:
                  exec_batch: int | None = None, compile: bool | None = None,
                  compile_mode: str | None = None, device: str = "cuda"):
         from fast import FastGraniteASR
-        model_dir = model_dir or os.environ.get("MODEL_DIR", os.path.join(_ROOT, "ref"))
+        model_dir = model_dir or os.environ.get("MODEL_DIR", os.path.join(os.path.dirname(_ROOT), "ref"))
         self.adaptive = (os.environ.get("ADAPTIVE", "1") == "1") if adaptive is None else adaptive
         self.exec_batch = int(os.environ.get("EXEC_BATCH", "48")) if exec_batch is None else exec_batch
         compile = (os.environ.get("COMPILE", "1") == "1") if compile is None else compile

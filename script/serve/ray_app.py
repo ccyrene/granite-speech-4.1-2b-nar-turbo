@@ -1,7 +1,7 @@
 """Ray Serve backend.
 
     pip install "ray[serve]"
-    serve run serve.ray_app:app          # from the repo root; MODEL_DIR=ref by default
+    PYTHONPATH=script serve run serve.ray_app:app          # from the repo root; MODEL_DIR=ref by default
 
 Env knobs:
     MODEL_DIR        path to the HF snapshot (default: ./ref)
@@ -20,6 +20,11 @@ from __future__ import annotations
 import asyncio
 import os
 import time
+
+import sys as _sys
+_SCRIPT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+if _SCRIPT not in _sys.path:
+    _sys.path.insert(0, _SCRIPT)
 
 from fastapi import FastAPI, Request
 from ray import serve

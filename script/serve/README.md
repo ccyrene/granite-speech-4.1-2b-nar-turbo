@@ -11,9 +11,9 @@ exactly what you want to compare.
 
 ```bash
 pip install "ray[serve]" httpx
-MODEL_DIR=ref serve run serve.ray_app:app                 # single replica, 1 GPU
+MODEL_DIR=ref PYTHONPATH=script serve run serve.ray_app:app                 # single replica, 1 GPU
 # pack 2 replicas per GPU to hide host prep/decode:
-NUM_REPLICAS=2 GPUS_PER_REPLICA=0.5 serve run serve.ray_app:app
+NUM_REPLICAS=2 GPUS_PER_REPLICA=0.5 PYTHONPATH=script serve run serve.ray_app:app
 
 curl -X POST --data-binary @sample.wav http://127.0.0.1:8000/transcribe
 ```
@@ -31,8 +31,8 @@ docker run --gpus 1 --rm -p 8000:8000 -p 8001:8001 \
 ### Load test (same client for both — apples to apples)
 
 ```bash
-python scripts/serve_client.py --backend ray    --synth -c 32 -n 512
-python scripts/serve_client.py --backend triton --synth -c 32 -n 512   # pip install tritonclient[http]
+python script/serve_client.py --backend ray    --synth -c 32 -n 512
+python script/serve_client.py --backend triton --synth -c 32 -n 512   # pip install tritonclient[http]
 # or point --wav-dir at real audio
 ```
 

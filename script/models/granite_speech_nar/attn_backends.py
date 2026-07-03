@@ -20,7 +20,7 @@ them between runs without reloading 4.3 GB of weights):
 
 Both levers change *kernels*, not math: outputs are argmax/transcript-stable with small float
 drift (fp32-accumulated fused softmax), NOT bit-identical -> same validation bar as the
-``compile-*`` levers (max|dlogit| + preds match). Parity + speed A/B: ``scripts/bench_attn_ab.py``.
+``compile-*`` levers (max|dlogit| + preds match). Parity + speed A/B: ``script/bench_attn_ab.py``.
 """
 from __future__ import annotations
 

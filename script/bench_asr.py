@@ -21,7 +21,7 @@ Levers (comma list via --levers; cumulative ablation = add one each run):
 
 Usage:
   PY=.venv/bin/python
-  $PY scripts/bench_asr.py --variant baseline --model-dir <hf_snapshot> --tokenizer <hf_snapshot>/tokenizer.json \
+  $PY script/bench_asr.py --variant baseline --model-dir <hf_snapshot> --tokenizer <hf_snapshot>/tokenizer.json \
       --config librispeech --split test.clean --batch 16 --max-samples 0
 Results append to results/bench_asr.json with a printed table.
 """
@@ -40,8 +40,9 @@ import torch.nn.functional as F
 torch.set_num_threads(int(os.environ.get("TORCH_NUM_THREADS", "4")))
 
 import sys
-ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-sys.path.insert(0, ROOT)
+SCRIPT = os.path.dirname(os.path.abspath(__file__))   # script/ = import root (packages live here)
+ROOT = os.path.dirname(SCRIPT)                        # repo root = ref/ + results/
+sys.path.insert(0, SCRIPT)
 from models.granite_speech_nar import load_model, MelFeatureExtractor, SpeechTokenizer, ASROutput  # noqa: E402
 
 DEV = "cuda"
@@ -227,7 +228,7 @@ def build(model, levers):
     if adaptive:
         from models.granite_speech_nar.adaptive import load_adaptive_config, RoutingConfig
         try:
-            routing, _v, _e = load_adaptive_config(os.path.join(ROOT, "configs", "routing.yaml"))
+            routing, _v, _e = load_adaptive_config(os.path.join(SCRIPT, "configs", "routing.yaml"))
         except Exception:
             routing = RoutingConfig()
         routing.enabled = True

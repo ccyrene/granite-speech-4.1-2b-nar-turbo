@@ -1,21 +1,22 @@
 #!/usr/bin/env python
-"""Run the BEST measured bench config (see best/__init__.py) via scripts/bench_asr.py.
+"""Run the BEST measured bench config (see best/__init__.py) via script/bench_asr.py.
 
-    python scripts/best_run.py [--model-dir ref] [--split test.clean] [--max-samples 500]
+    python script/best_run.py [--model-dir ref] [--split test.clean] [--max-samples 500]
                        [--batch 128] [--exec-batch 48] [--variant best] [--probe]
 
 Defaults reproduce the session-C record run (3934.7 RTFx e2e / 4025.7 model on H100 SXM):
 logical b128, EXEC_BATCH=48, FRAME_GRID=128, encoder max-autotune-no-cudagraphs, all
 champion levers + the fused dwconv custom kernel. Extra args after `--` are passed through
-to scripts/bench_asr.py unchanged.
+to script/bench_asr.py unchanged.
 """
 import argparse
 import os
 import subprocess
 import sys
 
-ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-sys.path.insert(0, ROOT)
+SCRIPT = os.path.dirname(os.path.abspath(__file__))
+ROOT = os.path.dirname(SCRIPT)
+sys.path.insert(0, SCRIPT)
 from best import BEST_LEVERS, BEST_BATCH, apply_best_env  # noqa: E402
 
 
@@ -37,7 +38,7 @@ def main() -> int:
     env = apply_best_env()
     env["EXEC_BATCH"] = str(args.exec_batch)
 
-    cmd = [sys.executable, os.path.join(ROOT, "scripts", "bench_asr.py"),
+    cmd = [sys.executable, os.path.join(SCRIPT, "bench_asr.py"),
            "--variant", args.variant, "--levers", BEST_LEVERS,
            "--model-dir", args.model_dir, "--config", args.config, "--split", args.split,
            "--batch", str(args.batch), "--max-samples", str(args.max_samples)]

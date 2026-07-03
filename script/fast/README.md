@@ -9,7 +9,7 @@ asr = FastGraniteASR("ref")          # or an HF snapshot dir
 asr.warmup()                          # optional: compile a few length-buckets up front
 text = asr.transcribe(waveform_16k)[0]
 ```
-or `python scripts/fast_demo.py --wav my.wav`
+or `python script/fast_demo.py --wav my.wav`
 
 ## What it does (stacked on the bit-identical `models/granite_speech_nar` reimpl)
 

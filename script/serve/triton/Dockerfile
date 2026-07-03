@@ -16,7 +16,7 @@ COPY requirements.txt /tmp/requirements.txt
 RUN grep -v '^torch==' /tmp/requirements.txt | pip install --no-cache-dir -r /dev/stdin
 
 COPY . /workspace/granite-speech-turbo
-ENV GRANITE_REPO=/workspace/granite-speech-turbo
+ENV GRANITE_REPO=/workspace/granite-speech-turbo/script
 ENV GRANITE_PTX_CACHE=/root/.ptx
 
-CMD ["tritonserver", "--model-repository=/workspace/granite-speech-turbo/serve/triton/model_repository"]
+CMD ["tritonserver", "--model-repository=/workspace/granite-speech-turbo/script/serve/triton/model_repository"]
