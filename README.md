@@ -20,8 +20,6 @@ test.clean, 500-clip subset, bf16, batch 128 (executed in chunks of 48). IBM's m
 
 ![End-to-end RTFx per GPU — A100 / H100 / H200 vs the IBM model card](media/g1_rtfx_per_gpu.png)
 
-![Optimization journey — 1,820 → 3,952 RTFx across the lever stack](media/g3_journey.png)
-
 ## WER — verified, not assumed
 
 **Head-to-head vs the official implementation** (same audio, same scorer, same GPU) — this is the
@@ -84,6 +82,8 @@ comparable within one scoring pipeline — even IBM's own two published numbers 
   (`(cd script && python -m cuda_kernels.conv1d)`).
 - Chunked 100k-vocab text-head argmax: same HBM bytes, more launches (a real fix needs a fused
   GEMM epilogue).
+
+![Optimization journey — 1,820 → 3,952 RTFx across the lever stack](media/g3_journey.png)
 
 ## Install
 
