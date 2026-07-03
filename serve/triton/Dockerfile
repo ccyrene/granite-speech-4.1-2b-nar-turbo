@@ -23,7 +23,7 @@ RUN pip install --no-cache-dir --force-reinstall --no-deps attrs packaging wheel
     pip install --no-cache-dir --force-reinstall "protobuf~=5.29.0"
 
 COPY . /workspace/granite-speech-turbo
-ENV GRANITE_REPO=/workspace/granite-speech-turbo/script
+ENV GRANITE_REPO=/workspace/granite-speech-turbo
 ENV GRANITE_PTX_CACHE=/root/.ptx
 
-CMD ["tritonserver", "--model-repository=/workspace/granite-speech-turbo/script/serve/triton/model_repository"]
+CMD ["tritonserver", "--model-repository=/workspace/granite-speech-turbo/serve/triton/model_repository"]

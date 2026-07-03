@@ -35,4 +35,4 @@ instance_group [
   }
 ]
 
-parameters { key: "GRANITE_REPO" value: { string_value: "/workspace/granite-speech-turbo/script" } }
+parameters { key: "GRANITE_REPO" value: { string_value: "/workspace/granite-speech-turbo" } }

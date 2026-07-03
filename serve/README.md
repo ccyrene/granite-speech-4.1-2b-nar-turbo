@@ -11,9 +11,9 @@ exactly what you want to compare.
 
 ```bash
 pip install "ray[serve]" httpx
-MODEL_DIR=ref PYTHONPATH=script serve run serve.ray_app:app                 # single replica, 1 GPU
+MODEL_DIR=ref PYTHONPATH=. serve run serve.ray_app:app                      # single replica, 1 GPU
 # pack 2 replicas per GPU to hide host prep/decode:
-NUM_REPLICAS=2 GPUS_PER_REPLICA=0.5 PYTHONPATH=script serve run serve.ray_app:app
+NUM_REPLICAS=2 GPUS_PER_REPLICA=0.5 PYTHONPATH=. serve run serve.ray_app:app
 
 curl -X POST --data-binary @sample.wav http://127.0.0.1:8000/transcribe
 ```

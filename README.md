@@ -1,4 +1,4 @@
-# granite-speech-turbo
+# Granite-Speech-4.1-2b-NAR-Turbo
 
 Hand-tuned pure-PyTorch inference stack for
 [`ibm-granite/granite-speech-4.1-2b-nar`](https://huggingface.co/ibm-granite/granite-speech-4.1-2b-nar)
@@ -17,6 +17,10 @@ shipped adaptive path adds ≤0.08 WER.**
 RTFx = total audio seconds ÷ wall-clock inference seconds (mel + model + decode), LibriSpeech
 test.clean, 500-clip subset, bf16, batch 128 (executed in chunks of 48). IBM's model card reports
 ~1,820 RTFx on H100 at batch 128.
+
+![End-to-end RTFx per GPU — A100 / H100 / H200 vs the IBM model card](media/g1_rtfx_per_gpu.png)
+
+![Optimization journey — 1,820 → 3,952 RTFx across the lever stack](media/g3_journey.png)
 
 ## WER — verified, not assumed
 
@@ -48,6 +52,8 @@ shipped adaptive path:
 scores 3.48 through this repo's scorer (see head-to-head above). WER absolute numbers are only
 comparable within one scoring pipeline — even IBM's own two published numbers disagree per set
 (e.g. GigaSpeech 10.12 model card vs 8.67 leaderboard).
+
+![WER parity — this repo (adaptive) vs the IBM model card across 7 leaderboard sets](media/g2_wer_parity.png)
 
 ## What makes it fast
 
@@ -119,7 +125,7 @@ python script/bench_asr.py \
 ## Repo layout
 
 ```
-script/                          all code lives here (script/ is the import root)
+script/                          core code (script/ is the import root)
 ├── bench_asr.py                 the benchmark harness behind every number in this README
 ├── best_run.py                  one-command record-run entry point
 ├── fast_demo.py                 single-wav demo (latency / RTFx)
@@ -130,9 +136,10 @@ script/                          all code lives here (script/ is the import root
 │                                (self-benchmark: cd script && python -m cuda_kernels.conv1d)
 ├── fast/                        compile-friendly serving wrapper (FastGraniteASR, 30s chunking)
 ├── best/                        record-run configuration constants
-├── serve/                       Ray Serve + Triton backends over one shared engine
-│                                (see script/serve/README.md)
 └── configs/routing.yaml         adaptive-routing thresholds
+serve/                           Ray Serve + Triton backends over one shared engine (imports
+                                 fast/ + models/ from script/; run with PYTHONPATH=. — see serve/README.md)
+media/                           result charts embedded in this README
 ref/                             model snapshot (gitignored — see Quickstart)
 results/                         benchmark outputs (gitignored)
 ```

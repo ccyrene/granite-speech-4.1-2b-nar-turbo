@@ -21,9 +21,11 @@ import threading
 import numpy as np
 import torch
 
-_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-if _ROOT not in sys.path:
-    sys.path.insert(0, _ROOT)
+_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))   # repo root (serve/ lives here)
+_SCRIPT = os.path.join(_ROOT, "script")                               # import root: fast/ models/ cuda_kernels/
+for _p in (_ROOT, _SCRIPT):
+    if _p not in sys.path:
+        sys.path.insert(0, _p)
 
 MAX_CLIP_S = 30.0
 SR = 16000
@@ -45,7 +47,7 @@ class TurboServeEngine:
                  exec_batch: int | None = None, compile: bool | None = None,
                  compile_mode: str | None = None, device: str = "cuda"):
         from fast import FastGraniteASR
-        model_dir = model_dir or os.environ.get("MODEL_DIR", os.path.join(os.path.dirname(_ROOT), "ref"))
+        model_dir = model_dir or os.environ.get("MODEL_DIR", os.path.join(_ROOT, "ref"))
         self.exec_batch = int(os.environ.get("EXEC_BATCH", "48")) if exec_batch is None else exec_batch
         compile = (os.environ.get("COMPILE", "1") == "1") if compile is None else compile
         compile_mode = os.environ.get("COMPILE_MODE") or compile_mode
