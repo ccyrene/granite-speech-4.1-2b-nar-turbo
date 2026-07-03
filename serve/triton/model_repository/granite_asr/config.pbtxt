@@ -1,0 +1,38 @@
+name: "granite_asr"
+backend: "python"
+max_batch_size: 48
+
+# variable-length mono 16 kHz float32 PCM; ragged so the dynamic batcher can group
+# different lengths — the python backend receives per-request tensors and the model
+# does duration-sorted chunked execution internally (serve/engine.py)
+input [
+  {
+    name: "AUDIO"
+    data_type: TYPE_FP32
+    dims: [ -1 ]
+    allow_ragged_batch: true
+  }
+]
+output [
+  {
+    name: "TEXT"
+    data_type: TYPE_STRING
+    dims: [ 1 ]
+  }
+]
+
+dynamic_batching {
+  max_queue_delay_microseconds: 50000
+  preferred_batch_size: [ 16, 32, 48 ]
+}
+
+# one engine per GPU; to hide host prep/decode run 2 instances (mirrors the Ray
+# GPUS_PER_REPLICA=0.5 trick) — VRAM allows it: ~7-13 GB per instance
+instance_group [
+  {
+    kind: KIND_GPU
+    count: 1
+  }
+]
+
+parameters { key: "GRANITE_REPO" value: { string_value: "/workspace/granite-speech-turbo" } }

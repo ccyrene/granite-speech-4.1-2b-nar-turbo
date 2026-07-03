@@ -121,6 +121,8 @@ cuda_kernels/                the winning fused dwconv+bias+SiLU NVRTC kernel
                              (self-benchmark: python -m cuda_kernels.conv1d)
 fast/                        compile-friendly serving wrapper (FastGraniteASR, 30s chunking)
 best/                        one-command record-run configuration
+serve/                       production serving: Ray Serve + Triton backends over one shared
+                             engine, with a unified load-test client (see serve/README.md)
 scripts/bench_asr.py         the benchmark harness behind every number in this README
 configs/routing.yaml         adaptive-routing thresholds
 ```

@@ -1,0 +1,5 @@
+# optional: serving backends + load-test client (see serve/README.md)
+ray[serve]
+httpx
+# Triton load-test client only (the server runs in the NGC container, serve/triton/Dockerfile):
+tritonclient[http]
