@@ -1,4 +1,4 @@
-# Granite-Speech-4.1-2b-NAR-Turbo
+# Granite-Speech-4.1-2B-NAR-Turbo
 
 Hand-tuned pure-PyTorch inference stack for
 [`ibm-granite/granite-speech-4.1-2b-nar`](https://huggingface.co/ibm-granite/granite-speech-4.1-2b-nar)
@@ -121,6 +121,27 @@ python script/bench_asr.py \
   --model-dir "$(readlink -f ref)" --config librispeech --split test.clean \
   --batch 128 --max-samples 500 --no-probe
 ```
+
+## Serving
+
+Two production backends wrap the same engine (`serve/engine.py`) — pick by your ops stack; full
+comparison + tuning notes in [`serve/README.md`](serve/README.md).
+
+```bash
+# Ray Serve — pure Python, easiest to extend
+MODEL_DIR=ref PYTHONPATH=. serve run serve.ray_app:app
+
+# Triton — binary gRPC + system shared-memory transport, C++ scheduler
+docker build -t granite-asr-triton -f serve/triton/Dockerfile .
+docker run --gpus 1 --rm -p 8000:8000 -p 8001:8001 granite-asr-triton
+
+# load test either backend with the same client
+python script/serve_client.py --backend triton --protocol grpc --shm -c 32 -n 256
+```
+
+Measured on A100 SXM4 (real LibriSpeech, warm): the fastest config is **one Triton instance,
+gRPC + system shared-memory — 739 RTFx @ concurrency 32**. gRPC+shm beats plain gRPC by ~30% at
+high load, and `instance_group: 2` (two engines per GPU) *hurts* this compute-bound model.
 
 ## Repo layout
 
