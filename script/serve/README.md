@@ -64,6 +64,44 @@ decisively; Ray's tail is tighter under saturation and the stack is far easier t
 Transport asymmetry to keep in mind: the Triton client ships decoded fp32 PCM (decode paid
 client-side), while the Ray ingress accepts WAV bytes and pays soundfile decode server-side.
 
+### Transport + scaling matrix (A100 SXM4, 2026-07-03) — gRPC / system-shm / instance_group=2
+
+Follow-up run answering the two questions the table above left open: does gRPC / system
+shared-memory beat HTTP, and does a second engine per GPU (`instance_group: 2`) recover the
+host-side gap. Same engine + client, real LibriSpeech (64 clips, 256 requests, warm cache,
+`ADAPTIVE=1`, `EXEC_BATCH=16`, client on-box). All rows `errors=0`.
+
+| config | concurrency | served-RTFx | p50 | p95 | p99 |
+|---|---:|---:|---:|---:|---:|
+| Triton x1 · http | 8 | 250 † | 266 ms | 5744 ms † | 6061 ms |
+| Triton x1 · http | 32 | 116 † | 8478 ms | 14303 ms † | 14340 ms |
+| Triton x1 · grpc | 8 | 654 | 243 ms | 591 ms | 637 ms |
+| Triton x1 · grpc | 32 | 568 | 1320 ms | 2503 ms | 2510 ms |
+| Triton x1 · grpc+shm | 8 | 653 | 246 ms | 665 ms | 782 ms |
+| **Triton x1 · grpc+shm** | **32** | **739** | 1098 ms | **2035 ms** | 2047 ms |
+| Triton x2 (instance_group=2) · grpc | 8 | 367 | 285 ms | 1690 ms | 1823 ms |
+| Triton x2 (instance_group=2) · grpc | 32 | 581 | 1044 ms | 3346 ms | 3349 ms |
+| Triton x2 (instance_group=2) · grpc | 64 | 627 | 2286 ms | 4703 ms | 4790 ms |
+| Ray Serve (same host) · http | 8 | 314 | 650 ms | 879 ms | 2251 ms |
+| Ray Serve (same host) · http | 32 | 329 | 2381 ms | 2844 ms | 2883 ms |
+
+† **HTTP ran first** (right after warmup), so it absorbed the residual-compile tail from novel
+batch/frame buckets — its p95 (5.7–14.3 s) and throughput are a warmup-order artifact, not a
+transport verdict. Its p50 @ c=8 (266 ms) matches the isolated warm HTTP run above (267 ms), so
+per-request cost is transport-agnostic; treat the http rows as cold and grpc/shm/x2/ray as warm.
+
+Reading:
+- **Best serving config: one Triton instance, gRPC + system shared-memory → 739 RTFx @ c=32**
+  (p50 1.1 s / p95 2.0 s), ~653 @ c=8.
+- **Shared memory earns its keep at high concurrency**: at c=32 grpc+shm (739) beats plain grpc
+  (568) by +30 %; at c=8 they tie (~653). The win scales with aggregate payload size — zero-copy
+  vs. a socket copy of ~1.6 MB fp32 PCM per request.
+- **`instance_group: 2` does NOT help this model — it hurts.** Two engines share one A100's SMs
+  and VRAM: at c=8 x2 (367) is 44 % *below* x1 grpc (654), and even at c=64 x2 (627) never
+  reaches x1's warm best (739). This single-pass NAR model is compute-bound and one engine
+  already saturates the GPU; a second one only adds contention. Refutes the earlier
+  "2-per-GPU recovers the host-side gap" hypothesis on A100.
+
 ### Hard-won findings baked into this directory
 
 1. **Batch-dim bucketing is mandatory for serving** (`engine.py` `BATCH_GRID`): arrival batches
@@ -108,6 +146,9 @@ KV cache, no decode loop) — continuous batching and paged attention have nothi
   5-10 min of autotune, every boot after that is warm.
 - Batch window (50 ms default): raise it under bursty low-QPS traffic to form fuller
   batches; lower it when p95 latency matters more than throughput.
-- Two engine instances per GPU (~7-13 GB VRAM each) overlap one instance's host work with
-  the other's GPU work — this recovers the measured host-side e2e/model gap (1.4% on A100
-  up to 4.5% on H200).
+- Two engine instances per GPU (`instance_group: 2` / `GPUS_PER_REPLICA=0.5`) was meant to
+  overlap one instance's host work with the other's GPU work, but **measured on A100 it lost to
+  a single engine at every concurrency** (see the transport + scaling matrix) — this
+  compute-bound single-pass model already saturates one GPU, so a second engine only adds
+  SM/VRAM contention. Close the host-side e2e/model gap with prep/decode overlap *inside* one
+  engine instead.
