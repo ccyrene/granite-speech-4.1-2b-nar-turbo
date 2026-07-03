@@ -1,0 +1,44 @@
+# Adaptive-inference config for Granite Speech NAR (OPTIMIZATION_PLAN Phases 2-5).
+# Load with models.granite_speech_nar.adaptive.config_io.load_adaptive_config("configs/routing.yaml").
+# ALL thresholds are STARTING POINTS — calibrate them against scripts/profile_full.py (Phase-1 gate)
+# and gate every change with scripts/eval_suite.py before loosening.
+
+routing:
+  enabled: false            # master switch; false => transcribe_adaptive == transcribe (lossless)
+
+  # --- ctc_fast gate (skip the editor only when ALL pass) ---
+  high_conf_threshold: 0.92         # mean collapsed-token confidence >=
+  min_token_conf_threshold: 0.75    # min collapsed-token confidence  >=
+  max_entropy: 0.45                 # mean per-frame entropy (nats)    <=
+  max_blank_ratio: 0.90             # fraction of blank frames         <=
+  max_repeat_ratio: 0.30            # adjacent-equal collapsed tokens  <=
+
+  # --- local vs full ---
+  max_local_spans: 3
+  max_local_tokens: 12
+
+  # --- suspicious-span detection ---
+  span_conf_threshold: 0.60
+  span_entropy_threshold: 1.50      # nats
+  span_merge_gap: 2
+  left_context_tokens: 12
+  right_context_tokens: 12
+
+  # --- local editor mode ---
+  local_crop_audio: false           # false (SAFE): local == full editor, only ctc_fast changes behaviour.
+                                     # true: cropped-audio windowed editor (real Phase-3 win) — VALIDATE ON A100 FIRST.
+  audio_crop_margin: 4
+  fallback_to_full_editor: true
+
+verifier:
+  min_confidence: 0.88
+  max_safe_edit_distance: 8
+  max_confident_wrong_score: 0.15
+  reject_unstable_span: true
+
+early_exit:                         # Phase 5 — EAGER ONLY (data-dependent break breaks torch.compile)
+  enabled: false
+  min_layers: 20
+  check_every: 4
+  patience: 2
+  conf_threshold: 0.90

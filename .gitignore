@@ -1,0 +1,13 @@
+__pycache__/
+*.pyc
+.env
+.env.box
+.venv/
+ref
+ref/
+golden/
+golden_batch/
+results/
+*.log
+.vscode/
+.DS_Store

@@ -1,0 +1,19 @@
+# Proven stack: torch 2.9.1 (cu128/cu130). NOTE 2026-07: the cu130 pip index no longer lists
+# 2.9.x — use  --index-url https://download.pytorch.org/whl/cu128  or the direct cu130 wheel URL.
+torch==2.9.1
+tokenizers
+safetensors
+soundfile
+numpy
+huggingface_hub
+transformers
+jiwer
+kaldialign
+datasets
+librosa
+pyyaml
+
+# custom CUDA kernel (convkernel lever) — NVRTC toolchain; safe to omit (falls back to eager)
+cuda-python
+nvidia-cuda-runtime-cu12
+nvidia-cuda-nvcc-cu12
