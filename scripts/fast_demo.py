@@ -1,6 +1,6 @@
 """Demo: transcribe a wav with the FastGraniteASR path + report warm latency / RTFx.
 
-  python fast/run.py [--model-dir DIR] [--wav PATH] [--mode reduce-overhead] [--lossless]
+  python scripts/fast_demo.py [--model-dir DIR] [--wav PATH] [--mode reduce-overhead] [--lossless]
 
 Defaults to the adaptive CTC-first winner (+45% RTFx / VRAM -29%, near-lossless).
 Pass --lossless to fall back to the strictly bit-exact `transcribe` path.

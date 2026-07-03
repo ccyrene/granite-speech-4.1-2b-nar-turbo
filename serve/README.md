@@ -31,8 +31,8 @@ docker run --gpus 1 --rm -p 8000:8000 -p 8001:8001 \
 ### Load test (same client for both — apples to apples)
 
 ```bash
-python serve/client.py --backend ray    --synth -c 32 -n 512
-python serve/client.py --backend triton --synth -c 32 -n 512   # pip install tritonclient[http]
+python scripts/serve_client.py --backend ray    --synth -c 32 -n 512
+python scripts/serve_client.py --backend triton --synth -c 32 -n 512   # pip install tritonclient[http]
 # or point --wav-dir at real audio
 ```
 

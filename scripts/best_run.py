@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 """Run the BEST measured bench config (see best/__init__.py) via scripts/bench_asr.py.
 
-    python best/run.py [--model-dir ref] [--split test.clean] [--max-samples 500]
+    python scripts/best_run.py [--model-dir ref] [--split test.clean] [--max-samples 500]
                        [--batch 128] [--exec-batch 48] [--variant best] [--probe]
 
 Defaults reproduce the session-C record run (3934.7 RTFx e2e / 4025.7 model on H100 SXM):

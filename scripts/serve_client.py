@@ -1,13 +1,13 @@
 """Unified load-test client for BOTH serving backends — same traffic, comparable numbers.
 
     # against Ray Serve (default http://127.0.0.1:8000/transcribe)
-    python serve/client.py --backend ray --wav-dir /path/to/wavs -c 32 -n 512
+    python scripts/serve_client.py --backend ray --wav-dir /path/to/wavs -c 32 -n 512
 
     # against Triton  (default http://127.0.0.1:8000, model granite_asr)
-    python serve/client.py --backend triton --wav-dir /path/to/wavs -c 32 -n 512
+    python scripts/serve_client.py --backend triton --wav-dir /path/to/wavs -c 32 -n 512
 
     # no wavs handy? synthesize N clips of 2-15 s of band-limited noise
-    python serve/client.py --backend ray --synth -c 32 -n 512
+    python scripts/serve_client.py --backend ray --synth -c 32 -n 512
 
 Reports: served-audio RTFx (total audio seconds / wall seconds), latency p50/p95/p99,
 error count. Run the SAME -c/-n against both backends for an apples-to-apples read.

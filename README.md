@@ -95,11 +95,11 @@ EOF
 ln -s <printed_path> ref
 
 # 2) reproduce the record run (subset-500, all levers, b128/exec48)
-python best/run.py
+python scripts/best_run.py
 
 # 3) full-set WER gates
-python best/run.py --variant gate_clean --split test.clean --max-samples 0
-python best/run.py --variant gate_other --split test.other --max-samples 0
+python scripts/best_run.py --variant gate_clean --split test.clean --max-samples 0
+python scripts/best_run.py --variant gate_other --split test.other --max-samples 0
 ```
 
 Direct harness invocation (all levers explicit):
