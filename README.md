@@ -87,6 +87,15 @@ comparable within one scoring pipeline — even IBM's own two published numbers 
 
 ## Install
 
+**Prerequisites:** an NVIDIA GPU with driver CUDA ≥ 12.8, and a **C compiler on `PATH`** (`gcc` /
+`build-essential`). The whole pipeline runs through `torch.compile`, and Triton/Inductor
+JIT-build their kernels at runtime — a stock `pytorch/pytorch:*-runtime` (or any minimal) image
+has no compiler and fails with `InductorError: Failed to find C compiler`. On a stripped image:
+
+```bash
+apt-get update && apt-get install -y build-essential   # or use a *-devel CUDA base image
+```
+
 ```bash
 pip install -r requirements.txt          # torch 2.9.1 + deps
 # NOTE (2026-07): the cu130 pip index no longer lists torch 2.9.x — install from the cu128 index
